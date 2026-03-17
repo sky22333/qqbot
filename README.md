@@ -96,9 +96,20 @@ func main() {
 }
 ```
 
+`target_id` 可选；不传时 SDK 会自动按 `target_type` 回填最近采集目标。  
+`target_type` 与 `target_id` 都不传时，SDK 会使用最近一次采集到的目标类型与 ID。
+
+如需在短生命周期任务中关闭采集器，可使用：
+
+```go
+client, err := qqbot.NewWithOptions(cfg, qqbot.ClientOptions{
+	StartCollector: false,
+})
+```
+
 ## 4. 目标采集
 
-启动服务后，用自己的 QQ 给机器人发消息，系统会自动采集目标并写入 `data/known_targets.json`。  
+启动服务后，用自己的 QQ 给机器人发消息，系统会自动采集目标并写入 `targets.file_path` 对应的文件（默认 `data/targets.json`）。  
 可通过 `GET /api/v1/targets` 查看。
 
 ## 5. 常用命令

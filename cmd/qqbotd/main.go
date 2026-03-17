@@ -10,10 +10,8 @@ import (
 	"syscall"
 
 	"github.com/sky22333/qqbot/config"
-	"github.com/sky22333/qqbot/internal/collector"
+	"github.com/sky22333/qqbot/internal/bootstrap"
 	"github.com/sky22333/qqbot/internal/httpserver"
-	"github.com/sky22333/qqbot/internal/notifier"
-	"github.com/sky22333/qqbot/internal/targets"
 )
 
 func main() {
@@ -31,30 +29,13 @@ func main() {
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 
-	flushInterval, err := cfg.TargetsFlushInterval()
+	components, err := bootstrap.New(cfg, logger, bootstrap.Options{StartCollector: true})
 	if err != nil {
 		panic(err)
 	}
-	targetStore, err := targets.NewStore(cfg.Targets.FilePath, cfg.Targets.MaxRecords, flushInterval)
-	if err != nil {
-		panic(err)
-	}
-
-	targetCollector, err := collector.New(cfg, logger, targetStore)
-	if err != nil {
-		panic(err)
-	}
-
-	targetCollector.Start()
 	logger.Info("采集器已启动")
 
-	n, err := notifier.New(cfg, logger)
-	if err != nil {
-		panic(err)
-	}
-	n.SetTargetStore(targetStore)
-
-	server, err := httpserver.New(cfg, logger, n, targetStore)
+	server, err := httpserver.New(cfg, logger, components.Notifier, components.Targets)
 	if err != nil {
 		panic(err)
 	}
@@ -83,8 +64,6 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	_ = server.Shutdown(ctx)
-	targetCollector.Stop()
-	n.Close()
-	_ = targetStore.Close()
+	components.Close()
 	logger.Info("服务已退出")
 }

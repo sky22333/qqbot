@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sky22333/qqbot/config"
 )
 
 func TestSendNotificationWithConfig(t *testing.T) {
@@ -19,7 +21,7 @@ func TestSendNotificationWithConfig(t *testing.T) {
 		configPath = "configs/config.toml"
 	}
 
-	cfg, err := LoadConfig(configPath)
+	cfg, err := config.LoadSDK(configPath)
 	if err != nil {
 		t.Fatalf("加载配置失败: %v", err)
 	}

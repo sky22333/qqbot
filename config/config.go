@@ -107,25 +107,56 @@ func Default() Config {
 }
 
 func Load(path string) (Config, error) {
+	return loadWithValidator(path, Config.ValidateForServer)
+}
+
+func LoadSDK(path string) (Config, error) {
+	return loadWithValidator(path, Config.ValidateForSDK)
+}
+
+func loadWithValidator(path string, validator func(Config) error) (Config, error) {
 	cfg := Default()
 	if _, err := toml.DecodeFile(path, &cfg); err != nil {
 		return Config{}, err
 	}
-	if err := cfg.Validate(); err != nil {
+	if err := validator(cfg); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
 }
 
-func (c Config) Validate() error {
+func (c Config) ValidateForSDK() error {
+	return c.validateCommon()
+}
+
+func (c Config) ValidateForServer() error {
+	if err := c.validateCommon(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(c.Server.ListenAddr) == "" {
+		return errors.New("server.listen_addr 不能为空")
+	}
+	if c.Server.MaxBodyBytes <= 0 {
+		return errors.New("server.max_body_bytes 必须大于 0")
+	}
+	if _, err := c.ReadTimeout(); err != nil {
+		return fmt.Errorf("server.read_timeout 无效: %w", err)
+	}
+	if _, err := c.WriteTimeout(); err != nil {
+		return fmt.Errorf("server.write_timeout 无效: %w", err)
+	}
+	if _, err := c.ShutdownTimeout(); err != nil {
+		return fmt.Errorf("server.shutdown_timeout 无效: %w", err)
+	}
+	return nil
+}
+
+func (c Config) validateCommon() error {
 	if strings.TrimSpace(c.QQBot.AppID) == "" {
 		return errors.New("qqbot.app_id 不能为空")
 	}
 	if strings.TrimSpace(c.QQBot.ClientSecret) == "" {
 		return errors.New("qqbot.client_secret 不能为空")
-	}
-	if strings.TrimSpace(c.Server.ListenAddr) == "" {
-		return errors.New("server.listen_addr 不能为空")
 	}
 	if c.Dispatch.QueueSize <= 0 {
 		return errors.New("dispatch.queue_size 必须大于 0")
@@ -139,20 +170,8 @@ func (c Config) Validate() error {
 	if c.Dispatch.RetryBackoffMS <= 0 {
 		return errors.New("dispatch.retry_backoff_ms 必须大于 0")
 	}
-	if c.Server.MaxBodyBytes <= 0 {
-		return errors.New("server.max_body_bytes 必须大于 0")
-	}
 	if _, err := c.RequestTimeout(); err != nil {
 		return fmt.Errorf("qqbot.request_timeout 无效: %w", err)
-	}
-	if _, err := c.ReadTimeout(); err != nil {
-		return fmt.Errorf("server.read_timeout 无效: %w", err)
-	}
-	if _, err := c.WriteTimeout(); err != nil {
-		return fmt.Errorf("server.write_timeout 无效: %w", err)
-	}
-	if _, err := c.ShutdownTimeout(); err != nil {
-		return fmt.Errorf("server.shutdown_timeout 无效: %w", err)
 	}
 	if _, err := c.EnqueueTimeout(); err != nil {
 		return fmt.Errorf("dispatch.enqueue_timeout 无效: %w", err)
