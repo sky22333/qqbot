@@ -1,0 +1,14 @@
+services:
+  qqbot:
+    image: ghcr.io/sky22333/qqbot
+    container_name: qqbot
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./configs/config.toml:/root/config.toml
+    logging:
+      driver: json-file
+      options:
+        max-size: "1g"
+        max-file: "2"
