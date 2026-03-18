@@ -1,0 +1,72 @@
+name: 发布二进制
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号（例如：v1.0.0）"
+        required: true
+        default: "v1.0.0"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: 计算版本号
+        id: meta
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: 运行测试与静态检查
+        run: |
+          go test ./...
+          go vet ./...
+
+      - name: 构建 Linux 二进制
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/qqbotd-linux-amd64 ./cmd/qqbotd
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/qqbotd-linux-arm64 ./cmd/qqbotd
+
+      - name: 生成发布说明
+        id: notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          {
+            echo "body<<EOF"
+            if [ -n "$PREV_TAG" ]; then
+              echo "## 更新内容"
+              git log --pretty=format:"- %s" "$PREV_TAG"..HEAD
+              echo ""
+            else
+              echo "## 首次发布"
+            fi
+            echo ""
+            echo "## 二进制文件"
+            echo "- qqbotd-linux-amd64"
+            echo "- qqbotd-linux-arm64"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: 发布 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.version }}
+          name: qqbot ${{ steps.meta.outputs.version }}
+          body: ${{ steps.notes.outputs.body }}
+          files: |
+            dist/qqbotd-linux-amd64
+            dist/qqbotd-linux-arm64
